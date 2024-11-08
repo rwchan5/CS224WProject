@@ -39,8 +39,9 @@ class GraphSetup:
         self.graph = nx.Graph()
         self.graph.add_nodes_from(airport_attributes.keys())
         nx.set_node_attributes(self.graph, airport_attributes)
-        
+
         self.train_set, self.test_set = train_test_split(df_filtered, test_size=0.2)
+        
 
     
     def train(self):
