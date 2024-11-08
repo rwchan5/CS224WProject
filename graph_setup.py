@@ -3,10 +3,12 @@ import os
 import sklearn
 import networkx as nx
 import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
 
 class GraphSetup:
     def __init__(self, data_path):
-        df = pd.read_csv(data_path)
+        df = pd.read_csv(data_path, low_memory=False)
 
         df_filtered = df.drop(df.columns[[0, 3, 4, 20, 21]], axis=1)
 
@@ -38,16 +40,17 @@ class GraphSetup:
         self.graph.add_nodes_from(airport_attributes.keys())
         nx.set_node_attributes(self.graph, airport_attributes)
         
-        self.train_set, self.test_set = sklearn.model_selection.train_test_split(df_filtered, test_size=0.2)
+        self.train_set, self.test_set = train_test_split(df_filtered, test_size=0.2)
+
     
-    def train():
+    def train(self):
         self.edge_labels = {}
 
         # load in the edges
         for _, row in self.train_set.iterrows():
             airport1id = row['airportid_1']
             airport2id = row['airportid_2']
-            miles = row['miles']
+            miles = row['nsmiles']
             passengers = row['passengers']
             carrier_lg = row['carrier_lg']
             large_ms = row['large_ms']
@@ -69,10 +72,29 @@ class GraphSetup:
                                 fare_low=fare_low,
                                 label=label)
             
-            self.edge_labels[(airport1id, airport2id, label)] = fare
+            self.edge_labels[(airport1id, airport2id, label)] = fare_lg
             
         
     def evaluate(self, test_set):
         pass
 
-g = GraphSetup("data.csv")
+    def visualize_graph(self, num_nodes=50):
+            plt.figure(figsize=(12, 8))
+            
+            subgraph = self.graph.subgraph(list(self.graph.nodes)[:num_nodes])
+            pos = nx.spring_layout(subgraph)  
+            
+            nx.draw(subgraph, pos, with_labels=True, node_size=500, node_color="lightblue", font_size=8)
+            nx.draw_networkx_edge_labels(
+                subgraph, pos,
+                edge_labels={(u, v): d['miles'] for u, v, d in subgraph.edges(data=True)},
+                font_size=7, label_pos=0.5
+            )
+            
+            plt.title("Visualization of Airport Graph")
+            plt.show()
+
+
+g = GraphSetup("data.csv") 
+g.train()
+g.visualize_graph(num_nodes=50) 
