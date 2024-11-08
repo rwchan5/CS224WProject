@@ -8,6 +8,15 @@ from sklearn.model_selection import train_test_split
 
 class GraphSetup:
     def __init__(self, data_path):
+        # supplemental dataset containing airport Geolocations
+        sup_df = pd.read_csv("data/airports.txt", header=None, names=["CustomID", "Name", "City", "Country", "IATA", "ICAO", "Latitude", "Longitude", "Altitude", "Timezone", "DST", "Tz DB time zone", "IsAirport", "Src"])
+        geotags = {}
+        for _, airport in sup_df.iterrows():
+            if pd.notna(airport['IATA']) and pd.notna(airport['Latitude']) and pd.notna(airport['Longitude']):
+                geotags[airport['IATA']] = (airport['Latitude'], airport['Longitude'])
+        
+
+        # main dataset
         df = pd.read_csv(data_path, low_memory=False)
 
         df_filtered = df.drop(df.columns[[0, 3, 4, 20, 21]], axis=1)
@@ -28,12 +37,14 @@ class GraphSetup:
             airport2 = row['airport_2']
             city1 = row['city1']
             city2 = row['city2']
+            latitude1, longitude1 = geotags.get(airport1, (None, None))
+            latitude2, longitude2 = geotags.get(airport2, (None, None))
 
             if airport1id not in airport_attributes:
-                airport_attributes[airport1id] = {'airport': airport1, 'city': city1}
+                airport_attributes[airport1id] = {'airport': airport1, 'city': city1, 'latitude': latitude1, 'longitude': longitude1}
             
             if airport2id not in airport_attributes:
-                airport_attributes[airport2id] = {'airport': airport2, 'city': city2}
+                airport_attributes[airport2id] = {'airport': airport2, 'city': city2, 'latitude': latitude2, 'longitude': longitude2}
 
         # set the edges
         self.graph = nx.Graph()
@@ -95,6 +106,6 @@ class GraphSetup:
             plt.show()
 
 
-g = GraphSetup("data.csv") 
+g = GraphSetup("data/flight_routes.csv") 
 g.train()
 g.visualize_graph(num_nodes=50) 
