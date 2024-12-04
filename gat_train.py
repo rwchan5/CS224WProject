@@ -11,7 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.utils import from_networkx
-from torch_geometric.nn import TransformerConv  
+from torch_geometric.nn import TransformerConv
 
 class GraphSetup:
     def __init__(self, data_path):
@@ -83,6 +83,7 @@ class GraphSetup:
         carrier_low_encoder.fit(df_filtered['carrier_low'].astype(str))
 
         # Process edges
+        print("Processing edges")
         for _, row in df_filtered.iterrows():
             airport1id = row['airportid_1']
             airport2id = row['airportid_2']
@@ -122,6 +123,7 @@ class GraphSetup:
                                 carrier_low=carrier_low, label=label)
 
         # Convert to numpy arrays
+        print("Converting to numpy arrays")
         self.edge_index = np.array(edge_index).T  # Shape: (2, num_edges)
         self.edge_attrs = np.array(edge_attrs, dtype=np.float32)  # Shape: (num_edges, num_edge_features)
         self.edge_labels = np.array(edge_labels, dtype=np.float32)  # Shape: (num_edges,)
@@ -139,61 +141,39 @@ class GraphSetup:
         self.train_indices, self.test_indices = train_test_split(edge_indices, test_size=0.2, random_state=42)
 
     def train(self, num_epochs=100):
-        # Model parameters
+        print("Starting training")
         hidden_dim = 64
-        num_node_features = self.data.num_node_features  # Should be 4
-        num_edge_features = self.data.edge_attr.shape[1]  # Should be 6
+        num_node_features = self.data.num_node_features  # dim 4
+        num_edge_features = self.data.edge_attr.shape[1]  # dim of 6
 
-        # Initialize models
         self.gnn_model = GNNModel(num_node_features, num_edge_features, hidden_dim)
         self.edge_mlp = EdgeMLP(hidden_dim, num_edge_features, hidden_dim)
 
-        # Optimizer and loss function
         optimizer = torch.optim.Adam(list(self.gnn_model.parameters()) + list(self.edge_mlp.parameters()), lr=0.01)
         criterion = torch.nn.MSELoss()
 
-        # Prepare training data
         train_edge_index = torch.tensor(self.edge_index[:, self.train_indices], dtype=torch.long)
         train_edge_attr = torch.tensor(self.edge_attrs[self.train_indices], dtype=torch.float)
         train_edge_labels = torch.tensor(self.edge_labels[self.train_indices], dtype=torch.float)
 
-        # Training loop
         print("beginning training loop")
         for epoch in range(num_epochs):
             self.gnn_model.train()
             self.edge_mlp.train()
             optimizer.zero_grad()
 
-            # check for nan values in self.data.x
-            if torch.isnan(self.data.x).any():
-                print("nan values in self.data.x")
-                break
-            if torch.isnan(self.data.edge_attr).any():
-                print("nan values in self.data.edge_attr")
-                break
-            if torch.isnan(train_edge_attr).any():
-                print("nan values in train_edge_attr")
-                break
-            print("none found")
-            break
-
-            # Forward pass
             node_embeddings = self.gnn_model(self.data.x, self.data.edge_index, self.data.edge_attr)
 
-            # Get predictions for training edges
             train_preds = self.edge_mlp(node_embeddings, train_edge_index, train_edge_attr)
 
-            # Compute loss
             loss = criterion(train_preds, train_edge_labels)
 
-            # Backward pass and optimization
             loss.backward()
             optimizer.step()
 
             if epoch % 10 == 0:
                 print(f'Epoch {epoch}, Loss: {loss.item()}')
 
-        # Evaluation
         self.evaluate()
 
     def evaluate(self):
@@ -218,7 +198,6 @@ class GraphSetup:
         plt.title("Visualization of Airport Graph")
         plt.show()
 
-# GNN Model definition
 class GNNModel(torch.nn.Module):
     def __init__(self, num_node_features, num_edge_features, hidden_dim):
         super(GNNModel, self).__init__()
@@ -232,7 +211,6 @@ class GNNModel(torch.nn.Module):
         x = self.conv3(x, edge_index, edge_attr)
         return x
 
-# Edge prediction MLP
 class EdgeMLP(torch.nn.Module):
     def __init__(self, node_embedding_dim, edge_feature_dim, hidden_dim):
         super(EdgeMLP, self).__init__()
@@ -250,6 +228,6 @@ class EdgeMLP(torch.nn.Module):
 
 # Instantiate and run
 print("training the model")
-g = GraphSetup("data/flight_routes.csv")
+g = GraphSetup("data/reduced.csv")
 g.train(num_epochs=100)
 g.visualize_graph(num_nodes=50)
